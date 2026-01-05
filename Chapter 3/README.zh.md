@@ -17,6 +17,7 @@ tmpfs            1M     0   1M   0% /tmp/mnt
 ```
 那么现在有个问题，挂载目录后，如何避免进程间同时修改文件。这里就需要引入一个新的文件系统，联合文件系统，联合文件系统（Union File System, UFS）有多种实现，主要用于将多个目录层合并为一个统一视图，常见的有 OverlayFS（现代Docker首选）、AUFS（早期Docker使用）、Btrfs、ZFS、Device Mapper 及其变种（如 Overlay2）等，它们各有特点，常在容器技术（如Docker, Podman）中用于实现分层镜像。 
 ![alt text](image.png)
+
 overlayFS是联合挂载技术的一种实现。除了overlayFS以外还有aufs，VFS，Brtfs，device mapper等技术。虽然实现细节不同，但是他们做的事情都是相同的。Linux内核为Docker提供的overalyFS驱动有2种：overlay2和overlay，overlay2是相对于overlay的一种改进，在inode利用率方面比overlay更有效。
 
 overlayfs通过三个目录来实现：lower目录、upper目录、以及work目录。三种目录合并出来的目录称为merged目录
@@ -77,6 +78,7 @@ mount -t overlay overlay -o lowerdir=A:B,upperdir=C,workdir=worker /tmp/test/mer
 ```
 可以看到之前的目录A、B、C被合并到了一起，并且相同文件名的文件会进行“覆盖”，这里覆盖并不是真正的覆盖，而是当合并时候目录中两个文件名称都相同时，merged层目录会显示离它最近层的文件。如下图所示，层级关系中upperdir比lowerdir更靠近merged层，而多个lowerdir的情况下，写的越靠前的目录离merged层目录越近。（这里merged层的file为虚线外框，表示文件实际上并不在merged目录下）
 ![alt text](image-1.png)
+
 本例子中，C为upperdir，A和B是lowerdir，而mount时写法为lowerdir=A:B，所以A在B上层。整体层级关系为：C > A > B。可以看到目录A与目录B中有一个同名文件a.txt，目前C与目录A之间有一个重名文件b.txt，根据上述论断，merged目录中a.txt应该显示的是A的内容，而b.txt应该显示的是C的内容。我们来确认下：
 ```
 [root@practice-server merged]# cat a.txt 
